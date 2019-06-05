@@ -1,0 +1,58 @@
+use crate::ast::*;
+use lalrpop_util::ErrorRecovery;
+
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static str>>);
+
+match {
+    "(", ")",
+    "λ", ".",
+    "let", "=", "in",
+    "::", "∀", "->",
+} else {
+    r"[1-9][[:digit:]]*"                => INT,
+    r"(true)|(false)"                   => BOOL,
+    r#""[[:word:]]+""#                  => STR,
+} else {
+    r"[[:alpha:]_\\+\-\\*/][[:word:]]*" => NAME,
+}
+
+Box<T>: Box<T> = T => Box::new(<>);
+
+pub Program: (Vec<(Name, Scheme)>, Vec<Exp>) = Fun* Exp+;
+
+Exp: Exp = {
+    Name                                        => Exp::Var(<>),
+    Lit                                         => Exp::Lit(<>),
+    "(" <Box<Exp>> <Box<Exp>> ")"               => Exp::App(<>),
+    "λ" <Name> "." <Box<Exp>>                   => Exp::Abs(<>),
+    "let" <Name> "=" <Box<Exp>> "in" <Box<Exp>> => Exp::Let(<>),
+    "(" <Exp> ")",
+    ! => { errors.push(<>); Exp::Error },
+};
+
+Name: Name = NAME => <>.to_string();
+
+Lit: Lit = {
+    INT  => Lit::Int(<>.parse().unwrap()),
+    BOOL => Lit::Bool(<>.parse().unwrap()),
+    STR  => Lit::Str(<>.to_string()),
+};
+
+Fun: (Name, Scheme) = {
+    <name:Name> "::" <vars:("∀" <Name+> ".")?> <ty:Type> => {
+        (name, Scheme { vars: vars.unwrap_or_else(|| Vec::new()), ty })
+    },
+};
+
+Type: Type = Type1;
+
+Type1: Type = {
+    <Type2> "->" <Type1> => Type::Con("->".to_string(), vec![<>]),
+    Type2,
+};
+
+Type2: Type = {
+    Name => Type::Con(<>, vec![]),
+    "(" <Type> ")",
+    ! => { errors.push(<>); Type::Error }
+};

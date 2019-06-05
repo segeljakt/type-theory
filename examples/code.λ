@@ -1,0 +1,48 @@
+- :: int -> int
++ :: int -> int -> int
+
+5
+
+"hello"
+
+true
+
+((+ 1) 2)
+
+((+ true) false)
+
+(let id = λx.x in id)
+
+(- (1 let id = λx.x in ) )
+
+(- 5)
+
+(- "test")
+
+(let five = λx.5 in five)
+
+(let id = λx.x in (id id))
+
+(let id = λx.(let y = x in y) in (id id))
+
+(let id = λx.(let y = x in y) in ((id id) 2))
+
+(let id = λx.(x x) in id)
+
+λm.(let y = m in (let x = (y true) in x))
+
+(2 2)
+
+λa.(let x = λb.(let y = λc.(a 1) in (y 2)) in (x 3))
+
+(λa.(let x = λb.(let y = λc.(a 1) in (y 2)) in (x 3)) λx.x)
+
+(let x = λb.(let y = λc.(λx.x 1) in (y 2)) in (x 3))
+
+λf.(λx.(f (x x)) λx.(f (x x)))
+
+(λf.(λx.(f (x x)) λx.(f (x x))) λx.x)
+
+λx.λy.x
+
+λx.λy.y

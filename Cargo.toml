@@ -1,0 +1,14 @@
+[package]
+build = "build.rs"
+name = "type-theory"
+version = "0.1.0"
+authors = ["Klas Segeljakt <klasseg@kth.se>"]
+edition = "2018"
+
+[dependencies]
+newtype = "0.2.1"
+lalrpop-util = "0.17.0"
+regex = "1.1.6"
+
+[build-dependencies]
+lalrpop = "0.17.0"

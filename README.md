@@ -44,6 +44,7 @@ Planned/finished features are:
 - [x] Parsing ([LALRPOP](https://crates.io/crates/lalrpop))
 - [ ] Uniquify ([De-Brujin Indices](https://en.wikipedia.org/wiki/De_Bruijn_index))
 - [x] Bi-directional type inference ([Hindley-Milner, Algorithm W](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system))
+- [ ] Normalization
 - [ ] Type classes
 
 # Quality of life:

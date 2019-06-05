@@ -2,6 +2,28 @@
 
 This project is both a playground for experimenting with type theory, and a reference for how one can implement a functional programming language compiler in Rust.
 
+# Syntax
+
+```
+PROG ::= FUN* EXP                    # Program
+
+EXP ::= NAME                         # Variable
+      | LIT                          # Literal
+      | λ VAR . EXP                  # Abstraction
+      | ( EXP EXP )                  # Application
+      | let NAME = EXP in EXP        # Let-binding
+
+LIT ::= INT                          # Integer
+      | BOOL                         # Boolean
+      | STR                          # String
+
+FUN ::= NAME :: ( ∀ NAME* . )? TYPE  # Function
+
+TYPE ::= TYPE → TYPE                 # Function type
+       | NAME                        # Nominal
+       | ( TYPE )                    # Parenthesized
+```
+
 # Testing
 
 You can run the examples as follows:
@@ -35,16 +57,14 @@ Error: `'t0` and `('t0 → 't1)` are recursive
 ...
 ```
 
-
 Planned/finished features are:
 
 # Front-end
 
 - [x] Lexing ([regex](https://crates.io/crates/regex))
 - [x] Parsing ([LALRPOP](https://crates.io/crates/lalrpop))
-- [ ] Uniquify ([De-Brujin Indices](https://en.wikipedia.org/wiki/De_Bruijn_index))
+- [ ] Alpha conversion ([De-Brujin Indices](https://en.wikipedia.org/wiki/De_Bruijn_index))
 - [x] Bi-directional type inference ([Hindley-Milner, Algorithm W](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system))
-- [ ] Normalization
 - [ ] Type classes
 
 # Quality of life:

@@ -40,17 +40,17 @@ Planned/finished features are:
 
 # Front-end
 
-[x] Lexing ([regex](https://crates.io/crates/regex))
-[x] Parsing ([LALRPOP](https://crates.io/crates/lalrpop))
-[ ] Alpha conversion ([De-Brujin Indices](https://en.wikipedia.org/wiki/De_Bruijn_index))
-[x] Bi-directional type inference ([Hindley-Milner, Algorithm W](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system))
-[ ] Type classes
+- [x] Lexing ([regex](https://crates.io/crates/regex))
+- [x] Parsing ([LALRPOP](https://crates.io/crates/lalrpop))
+- [ ] Alpha conversion ([De-Brujin Indices](https://en.wikipedia.org/wiki/De_Bruijn_index))
+- [x] Bi-directional type inference ([Hindley-Milner, Algorithm W](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system))
+- [ ] Type classes
 
 # Quality of life:
 
-[x] Pretty printing
-[x] Error recovery
-[ ] Language Server Protocol integration ([LSP](https://langserver.org/) using [codespan](https://docs.rs/codespan/0.3.0/codespan/))
+- [x] Pretty printing
+- [x] Error recovery
+- [ ] Language Server Protocol integration ([LSP](https://langserver.org/) using [codespan](https://docs.rs/codespan/0.3.0/codespan/))
 
 # Middle-end
 

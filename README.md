@@ -1,4 +1,4 @@
-<h1 align="center">Type Theory - Typed λ-calculus in Rust</h1>
+<h1 align="center">Typed λ-calculus in Rust</h1>
 
 This project is both a playground for experimenting with type theory, and a reference for how one can implement a functional programming language compiler in Rust.
 

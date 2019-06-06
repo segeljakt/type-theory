@@ -10,8 +10,9 @@ PROG ::= FUN* EXP                    # Program
 EXP ::= NAME                         # Variable
       | LIT                          # Literal
       | λ VAR . EXP                  # Abstraction
-      | ( EXP EXP )                  # Application
+      | EXP EXP                      # Application
       | let NAME = EXP in EXP        # Let-binding
+      | ( EXP )                      # Parenthesized
 
 LIT ::= INT                          # Integer
       | BOOL                         # Boolean

@@ -9,7 +9,7 @@ use {
     std::{fs::File, io::prelude::*},
 };
 
-lalrpop_mod!(pub parser);
+lalrpop_mod!(#[allow(unused_parens)] pub parser);
 
 pub fn compile_file(path: &str) -> Result<(), Box<dyn std::error::Error + 'static>> {
     let mut file = File::open(path)?;
@@ -21,9 +21,11 @@ pub fn compile_file(path: &str) -> Result<(), Box<dyn std::error::Error + 'stati
 
 pub fn compile(source: String) -> Result<(), Box<dyn std::error::Error + 'static>> {
     let mut errors = Vec::new();
-    let (funs, exps) = parser::ProgramParser::new().parse(&mut errors, &source).unwrap();
+    let (funs, exps) = parser::ProgramParser::new()
+        .parse(&mut errors, &source)
+        .unwrap();
 
-    let mut ctx = Ctx::new();
+    let mut ctx = Env::new();
     for (name, scheme) in funs {
         ctx.insert(name, scheme);
     }

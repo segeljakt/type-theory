@@ -1,4 +1,7 @@
-use {newtype::NewType, std::collections::HashMap};
+use {
+    newtype::NewType,
+    std::collections::{HashMap as Map, HashSet as Set},
+};
 
 pub type Name = String;
 pub type TermName = String;
@@ -23,40 +26,40 @@ pub enum Lit {
 
 #[derive(Clone, Debug)]
 pub enum Type {
+    /// Unbound type (TypeName is free)
     Var(TypeName),
-    Con(TypeName, Vec<Type>),
+    /// Constructed type (TypeName is bound)
+    Cons(TypeName, Vec<Type>),
     Error,
 }
 
 #[derive(Clone, Debug)]
 pub struct Scheme {
-    pub vars: Vec<TypeName>,
+    pub vars: Set<TypeName>,
     pub ty: Type,
 }
 
 #[derive(Clone, Debug, NewType)]
-pub struct Info(HashMap<TypeName, String>);
+pub struct Info(Map<TypeName, String>);
 
 #[derive(Clone, Debug, NewType)]
-pub struct Sub(pub HashMap<TypeName, Type>);
+pub struct Subs(pub Map<TypeName, Type>);
 
 #[derive(Clone, Debug, NewType)]
-pub struct Ctx(pub HashMap<TermName, Scheme>);
+pub struct Env(pub Map<TermName, Scheme>);
 
-pub struct LambdaType;
-
-impl LambdaType {
-    pub fn int() -> String {
-        "int".to_owned()
+impl Type {
+    pub fn int() -> Type {
+        Type::Cons("int".to_owned(), vec![])
     }
-    pub fn bool() -> String {
-        "bool".to_owned()
+    pub fn bool() -> Type {
+        Type::Cons("bool".to_owned(), vec![])
     }
-    pub fn str() -> String {
-        "str".to_owned()
+    pub fn str() -> Type {
+        Type::Cons("str".to_owned(), vec![])
     }
-    pub fn fun() -> String {
-        "->".to_owned()
+    pub fn fun(arg: Type, ret: Type) -> Type {
+        Type::Cons("->".to_owned(), vec![arg, ret])
     }
 }
 

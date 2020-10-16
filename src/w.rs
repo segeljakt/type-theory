@@ -2,76 +2,71 @@
 use {
     crate::ast::*,
     std::{
-        collections::{HashMap, HashSet},
-        hash::Hash,
+        collections::{HashMap as Map, HashSet as Set},
         result,
     },
 };
 
-trait Union {
-    fn union(&self, other: &Self) -> Self;
-}
+type Result<T> = result::Result<T, TypeError>;
 
-/// Implement union for HashMap such that the value in `self` is used over the value in `other` in
-/// the event of a collision.
-impl<K, V> Union for HashMap<K, V>
-where
-    K: Clone + Eq + Hash,
-    V: Clone,
-{
-    fn union(&self, other: &Self) -> Self {
-        let mut res = self.clone();
-        for (key, value) in other {
+impl Subs {
+    /// Construct an empty substitution.
+    fn new() -> Subs {
+        Subs(Map::new())
+    }
+    /// Union `s1` with `s2` and prefer element of `s1` in the case of collision.
+    fn union(s1: &Subs, s2: &Subs) -> Self {
+        let mut res = s1.clone();
+        for (key, value) in &s2.0 {
             res.entry(key.clone()).or_insert(value.clone());
         }
         res
     }
+    /// To compose two substitutions s1 and s2, we apply s1 to each
+    /// type in s2 and union the resulting substitution with s1.
+    fn compose(s1: Subs, s2: Subs) -> Subs {
+        let s2 = Subs(
+            s2.iter()
+                .map(|(k, v)| (k.clone(), v.substitute(&s1)))
+                .collect(),
+        );
+        Subs::union(&s1, &s2)
+    }
 }
-
-type Result<T> = result::Result<T, TypeError>;
 
 trait TypeMethods {
-    fn ftv(&self) -> HashSet<TypeName>;
-    fn apply(&self, sub: &Sub) -> Self;
+    /// Returns the set of free type variables of self
+    fn ftv(&self) -> Set<TypeName>;
+    /// Applies a substitution to self
+    fn substitute(&self, sub: &Subs) -> Self;
 }
 
-impl<'a, T: TypeMethods> TypeMethods for Vec<T> {
-    fn ftv(&self) -> HashSet<TypeName> {
-        self.iter().fold(HashSet::new(), |set, ty| {
-            set.union(&ty.ftv()).cloned().collect()
-        })
-    }
-
-    fn apply(&self, sub: &Sub) -> Vec<T> {
-        self.iter().map(|ty| ty.apply(sub)).collect()
-    }
-}
-
-fn unify(ty1: &Type, ty2: &Type) -> Result<Sub> {
+/// Unifies two types `ty1` and `ty2`
+fn unify(ty1: &Type, ty2: &Type) -> Result<Subs> {
     match (ty1, ty2) {
         (Type::Var(name), ty) | (ty, Type::Var(name)) => {
             if ty.ftv().contains(name) {
                 Err(TypeError(format!("`{}` and `{}` are recursive", ty1, ty2,)))
             } else {
-                let mut sub = Sub::new();
+                let mut sub = Subs::new();
                 sub.insert(name.clone(), ty.clone());
                 Ok(sub)
             }
         }
-        (Type::Con(name1, args1), Type::Con(name2, args2)) => {
+        (Type::Cons(name1, args1), Type::Cons(name2, args2)) => {
             if name1 != name2 || args1.len() != args2.len() {
                 Err(TypeError(format!("Cannot unify `{}` with `{}`", ty1, ty2,)))
             } else {
                 args1
                     .iter()
                     .zip(args2)
-                    .try_fold(Sub::new(), |sub, (arg1, arg2)| {
-                        let new_sub = unify(&arg1.apply(&sub), &arg2.apply(&sub))?;
-                        Ok(compose(new_sub, sub))
+                    .try_fold(Subs::new(), |sub, (arg1, arg2)| {
+                        let new_sub = unify(&arg1.substitute(&sub), &arg2.substitute(&sub))?;
+                        Ok(Subs::compose(new_sub, sub))
                     })
             }
         }
-        (Type::Error, _) | (_, Type::Error) => Ok(Sub::new()),
+        (Type::Error, _) | (_, Type::Error) => Ok(Subs::new()),
     }
 }
 
@@ -80,7 +75,7 @@ static mut NEXT: usize = 0;
 impl Type {
     pub fn new_var() -> Type {
         unsafe {
-            let var = Type::Var(format!("{}", NEXT));
+            let var = Type::Var(format!("'t{}", NEXT));
             NEXT += 1;
             var
         }
@@ -88,49 +83,55 @@ impl Type {
 }
 
 impl TypeMethods for Type {
-    fn ftv(&self) -> HashSet<TypeName> {
+    // Return the set of free type variables in self
+    fn ftv(&self) -> Set<TypeName> {
         match self {
             Type::Var(name) => {
-                let mut set = HashSet::new();
+                let mut set = Set::new();
                 set.insert(name.clone());
                 set
             }
-            Type::Con(_, args) => args.iter().fold(HashSet::new(), |set, arg| {
-                set.union(&arg.ftv()).cloned().collect()
-            }),
-            Type::Error => HashSet::new()
+            Type::Cons(_, args) => args.ftv(),
+            Type::Error => Set::new(),
         }
     }
 
-    fn apply(&self, sub: &Sub) -> Type {
+    // Substitute all type variables in `self` with `sub`
+    fn substitute(&self, sub: &Subs) -> Type {
         match self {
             Type::Var(name) => sub.get(name).cloned().unwrap_or(self.clone()),
-            Type::Con(name, args) => Type::Con(
-                name.clone(),
-                args.iter().cloned().map(|arg| arg.apply(sub)).collect(),
-            ),
-            Type::Error => Type::Error
+            Type::Cons(name, args) => Type::Cons(name.clone(), args.substitute(sub)),
+            Type::Error => Type::Error,
         }
     }
 }
 
+/// Helper methods for Type and Scheme
+impl<'a, T: TypeMethods> TypeMethods for Vec<T> {
+    fn ftv(&self) -> Set<TypeName> {
+        self.iter().fold(Set::new(), |set, ty| {
+            set.union(&ty.ftv()).cloned().collect()
+        })
+    }
+
+    fn substitute(&self, sub: &Subs) -> Vec<T> {
+        self.iter().map(|ty| ty.substitute(sub)).collect()
+    }
+}
+
 impl TypeMethods for Scheme {
-    /// The free type variables in a scheme are those that are free in the internal type and not
-    /// bound by the variable mapping.
-    fn ftv(&self) -> HashSet<TypeName> {
-        self.ty
-            .ftv()
-            .difference(&self.vars.iter().cloned().collect())
-            .cloned()
-            .collect()
+    /// The free type variables in a scheme are those that are free
+    /// in the internal type and not bound by the variable mapping.
+    fn ftv(&self) -> Set<TypeName> {
+        self.ty.ftv().difference(&self.vars).cloned().collect()
     }
 
     /// Substitutions are applied to free type variables only.
-    fn apply(&self, sub: &Sub) -> Scheme {
+    fn substitute(&self, sub: &Subs) -> Scheme {
         Scheme::poly(
             self.vars.clone(),
             self.ty
-                .apply(&self.vars.iter().fold(sub.clone(), |mut sub, var| {
+                .substitute(&self.vars.iter().fold(sub.clone(), |mut sub, var| {
                     sub.remove(var);
                     sub
                 })),
@@ -139,60 +140,51 @@ impl TypeMethods for Scheme {
 }
 
 impl Scheme {
-    pub fn poly(vars: Vec<TypeName>, ty: Type) -> Scheme {
+    /// Returns a polytype (Type with quantifiers)
+    pub fn poly(vars: Set<TypeName>, ty: Type) -> Scheme {
         Scheme { ty, vars }
     }
+
+    /// Returns a monotype (Type with without quantifiers)
     pub fn mono(ty: Type) -> Scheme {
         Scheme {
             ty,
-            vars: Vec::new(),
+            vars: Set::new(),
         }
     }
     /// Instantiates a scheme into a type. Replaces all bound type variables with fresh type
     /// variables and return the resulting type.
     fn instantiate(&self) -> Type {
-        let newvars = self.vars.iter().map(|_| Type::new_var());
-        self.ty
-            .apply(&Sub(self.vars.iter().cloned().zip(newvars).collect()))
+        self.ty.substitute(&Subs(
+            self.vars
+                .iter()
+                .cloned()
+                .zip(self.vars.iter().map(|_| Type::new_var()))
+                .collect(),
+        ))
     }
 }
 
-impl Sub {
-    /// Construct an empty substitution.
-    fn new() -> Sub {
-        Sub(HashMap::new())
-    }
-}
-
-/// To compose two substitutions, we apply self to each type in other and union the resulting
-/// substitution with self.
-fn compose(s1: Sub, s2: Sub) -> Sub {
-    Sub(s1.union(&s2.iter().map(|(k, v)| (k.clone(), v.apply(&s1))).collect()))
-}
-
-impl TypeMethods for Ctx {
-    /// The free type variables of a type environment is the union of the free type variables of
-    /// each scheme in the environment.
-    fn ftv(&self) -> HashSet<TypeName> {
-        self.values()
-            .map(|x| x.clone())
-            .collect::<Vec<Scheme>>()
-            .ftv()
+impl TypeMethods for Env {
+    /// The free type variables of a type environment is the union
+    /// of the free type variables of each scheme in the environment.
+    fn ftv(&self) -> Set<TypeName> {
+        self.values().cloned().collect::<Vec<Scheme>>().ftv()
     }
 
     /// To apply a substitution, we just apply it to each scheme in the type environment.
-    fn apply(&self, sub: &Sub) -> Ctx {
-        Ctx(self
+    fn substitute(&self, sub: &Subs) -> Env {
+        Env(self
             .iter()
-            .map(|(k, v)| (k.clone(), v.apply(sub)))
+            .map(|(k, v)| (k.clone(), v.substitute(sub)))
             .collect())
     }
 }
 
-impl Ctx {
+impl Env {
     /// Construct an empty type environment.
-    pub fn new() -> Ctx {
-        Ctx(HashMap::new())
+    pub fn new() -> Env {
+        Env(Map::new())
     }
 
     /// Generalize creates a scheme
@@ -203,55 +195,45 @@ impl Ctx {
         }
     }
 
-    fn infer(&self, exp: &Exp) -> Result<(Type, Sub)> {
+    fn infer(&self, exp: &Exp) -> Result<(Type, Subs)> {
         match exp {
-            Exp::Var(name) => match self.get(name) {
-                Some(scheme) => Ok((scheme.instantiate(), Sub::new())),
-                None => Err(TypeError(format!(
-                    "Cannot reference unbound variable: {}",
-                    name
-                ))),
+            Exp::Var(name) => self
+                .get(name)
+                .map(|scheme| (scheme.instantiate(), Subs::new()))
+                .ok_or_else(|| TypeError(format!("Cannot reference unbound variable: {}", name))),
+            Exp::Lit(lit) => match lit {
+                Lit::Int(_) => Ok((Type::int(), Subs::new())),
+                Lit::Bool(_) => Ok((Type::bool(), Subs::new())),
+                Lit::Str(_) => Ok((Type::str(), Subs::new())),
             },
-            Exp::Lit(lit) => {
-                let name = match lit {
-                    Lit::Int(_) => LambdaType::int(),
-                    Lit::Bool(_) => LambdaType::bool(),
-                    Lit::Str(_) => LambdaType::str(),
-                };
-                let ty = Type::Con(name, Vec::new());
-                Ok((ty, Sub::new()))
-            }
             Exp::Abs(name, expr) => {
                 let ty_arg = Type::new_var();
                 let mut env = self.clone();
                 env.insert(name.clone(), Scheme::mono(ty_arg.clone()));
                 let (ty_ret, s1) = env.infer(expr)?;
-                let ty_arg = ty_arg.apply(&s1);
-                let ty_fun = Type::Con(LambdaType::fun(), vec![ty_arg, ty_ret]);
+                let ty_arg = ty_arg.substitute(&s1);
+                let ty_fun = Type::fun(ty_arg, ty_ret);
                 Ok((ty_fun, s1))
             }
             Exp::App(fun, arg) => {
                 let (ty_fun, s1) = self.infer(fun)?;
-                let (ty_arg, s2) = self.apply(&s1).infer(arg)?;
+                let (ty_arg, s2) = self.substitute(&s1).infer(arg)?;
                 let ty_ret = Type::new_var();
-                let ty_fun = ty_fun.apply(&s2);
-                let s3 = unify(
-                    &ty_fun,
-                    &Type::Con(LambdaType::fun(), vec![ty_arg, ty_ret.clone()]),
-                )?;
-                let ty_ret = ty_ret.apply(&s3);
-                Ok((ty_ret, compose(s3, compose(s2, s1))))
+                let ty_fun = ty_fun.substitute(&s2);
+                let s3 = unify(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
+                let ty_ret = ty_ret.substitute(&s3);
+                Ok((ty_ret, Subs::compose(s3, Subs::compose(s2, s1))))
             }
-            Exp::Let(name, expr, body) => {
+            Exp::Let(name, arg, body) => {
                 let mut env = self.clone();
                 env.remove(name);
-                let (ty_expr, s1) = self.infer(expr)?;
-                let scheme = env.apply(&s1).generalize(&ty_expr);
+                let (ty_arg, s1) = self.infer(arg)?;
+                let scheme = env.substitute(&s1).generalize(&ty_arg);
                 env.insert(name.clone(), scheme);
-                let (ty_body, s2) = env.apply(&s1).infer(body)?;
-                Ok((ty_body, compose(s2, s1)))
+                let (ty_body, s2) = env.substitute(&s1).infer(body)?;
+                Ok((ty_body, Subs::compose(s2, s1)))
             }
-            Exp::Error => Ok((Type::Error, Sub::new())),
+            Exp::Error => Ok((Type::Error, Subs::new())),
         }
     }
 
@@ -260,7 +242,7 @@ impl Ctx {
         unsafe {
             NEXT = 0;
         }
-        let (t, s) = self.infer(exp)?;
-        Ok(t.apply(&s))
+        let (ty, s) = self.infer(exp)?;
+        Ok(ty.substitute(&s))
     }
 }

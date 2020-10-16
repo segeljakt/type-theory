@@ -8,51 +8,71 @@ match {
     "λ", ".",
     "let", "=", "in",
     "::", "∀", "->",
+    ";",
 } else {
-    r"[1-9][[:digit:]]*"                => INT,
-    r"(true)|(false)"                   => BOOL,
-    r#""[[:word:]]+""#                  => STR,
+    r"[1-9][[:digit:]]*"                => TInt,
+    r"(true)|(false)"                   => TBool,
+    r#""[[:word:]]+""#                  => TStr,
 } else {
-    r"[[:alpha:]_\\+\-\\*/][[:word:]]*" => NAME,
+    r"[[:alpha:]_\\+\-\\*/][[:word:]]*" => TName,
 }
 
 Box<T>: Box<T> = T => Box::new(<>);
 
-pub Program: (Vec<(Name, Scheme)>, Vec<Exp>) = Fun* Exp+;
+pub Program: (Vec<(Name, Scheme)>, Vec<Exp>) = Fun* (<Exp> ";")+;
 
-Exp: Exp = {
-    Name                                        => Exp::Var(<>),
-    Lit                                         => Exp::Lit(<>),
-    "(" <Box<Exp>> <Box<Exp>> ")"               => Exp::App(<>),
-    "λ" <Name> "." <Box<Exp>>                   => Exp::Abs(<>),
-    "let" <Name> "=" <Box<Exp>> "in" <Box<Exp>> => Exp::Let(<>),
+Exp = Exp0;
+
+Exp0: Exp = {
+    "let" <Name> "=" <Box<Exp1>> "in" <Box<Exp0>> => Exp::Let(<>),
+    Exp1,
+};
+
+Exp1: Exp = {
+  "λ" <Name> "." <Box<Exp1>> => Exp::Abs(<>),
+  Exp2,
+};
+
+Exp2: Exp = {
+    <Box<Exp2>> <Box<Exp3>> => Exp::App(<>),
+    Exp3,
+};
+
+Exp3: Exp = {
+    Name => Exp::Var(<>),
+    Lit => Exp::Lit(<>),
     "(" <Exp> ")",
     ! => { errors.push(<>); Exp::Error },
 };
 
-Name: Name = NAME => <>.to_string();
+Name: Name = TName => <>.to_string();
 
 Lit: Lit = {
-    INT  => Lit::Int(<>.parse().unwrap()),
-    BOOL => Lit::Bool(<>.parse().unwrap()),
-    STR  => Lit::Str(<>.to_string()),
+    TInt  => Lit::Int(<>.parse().unwrap()),
+    TBool => Lit::Bool(<>.parse().unwrap()),
+    TStr  => Lit::Str(<>.to_string()),
 };
 
-Fun: (Name, Scheme) = {
-    <name:Name> "::" <vars:("∀" <Name+> ".")?> <ty:Type> => {
-        (name, Scheme { vars: vars.unwrap_or_else(|| Vec::new()), ty })
-    },
+Fun: (Name, Scheme) = <Name> "::" <("∀" <Name+> ".")?> <Type> => {
+  let (name, vars, ty) = (<>);
+  let scheme = Scheme { ty, vars: vars.unwrap_or_else(Vec::new).into_iter().collect() };
+  (name, scheme)
 };
 
-Type: Type = Type1;
+Type = Type0;
+
+Type0: Type = {
+    <Type1> "->" <Type0> => Type::Cons("->".to_string(), vec![<>]),
+    Type1,
+};
 
 Type1: Type = {
-    <Type2> "->" <Type1> => Type::Con("->".to_string(), vec![<>]),
-    Type2,
-};
-
-Type2: Type = {
-    Name => Type::Con(<>, vec![]),
+    Name => {
+      match <>.as_ref() {
+        "int" | "bool" | "str" => Type::Cons(<>, vec![]),
+        _ => Type::Var(<>),
+      }
+    },
     "(" <Type> ")",
     ! => { errors.push(<>); Type::Error }
 };

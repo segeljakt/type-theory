@@ -1,48 +1,63 @@
 - :: int -> int
 + :: int -> int -> int
+* :: ∀A . A -> A 
 
-5
+* 1;
 
-"hello"
+let id = λx.x in
+let a = id 1 in
+let b = id true in b;
 
-true
+5;
 
-((+ 1) 2)
+"hello";
 
-((+ true) false)
+true;
 
-(let id = λx.x in id)
++ 1 2;
 
-(- (1 let id = λx.x in ) )
++ true false;
 
-(- 5)
+let id = λx.x in
+id;
 
-(- "test")
+let id = λx.x in
+id 1;
 
-(let five = λx.5 in five)
+- 5;
 
-(let id = λx.x in (id id))
+- "test";
 
-(let id = λx.(let y = x in y) in (id id))
+let five = λx.5 in
+five;
 
-(let id = λx.(let y = x in y) in ((id id) 2))
+let id = λx.x in
+id id;
 
-(let id = λx.(x x) in id)
+(let id = λx.(let y = x in y) in (id id));
 
-λm.(let y = m in (let x = (y true) in x))
+(let id = λx.(let y = x in y) in ((id id) 2));
 
-(2 2)
+(let id = λx.(x x) in id);
 
-λa.(let x = λb.(let y = λc.(a 1) in (y 2)) in (x 3))
+λm.(let y = m in (let x = (y true) in x));
 
-(λa.(let x = λb.(let y = λc.(a 1) in (y 2)) in (x 3)) λx.x)
+(2 2);
 
-(let x = λb.(let y = λc.(λx.x 1) in (y 2)) in (x 3))
+λa.(let x = λb.(let y = λc.(a 1) in (y 2)) in (x 3));
 
-λf.(λx.(f (x x)) λx.(f (x x)))
+(λa.(let x = λb.(let y = λc.(a 1) in (y 2)) in (x 3)) λx.x);
 
-(λf.(λx.(f (x x)) λx.(f (x x))) λx.x)
+(let x = λb.(let y = λc.(λx.x 1) in (y 2)) in (x 3));
 
-λx.λy.x
+λf.(λx.(f (x x)) λx.(f (x x)));
 
-λx.λy.y
+(λf.(λx.(f (x x)) λx.(f (x x))) λx.x);
+
+λx.λy.x;
+
+λx.λy.y;
+
+((* 1) 2);
+
+((* true) false);

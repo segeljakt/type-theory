@@ -25,15 +25,15 @@ pub fn compile(source: String) -> Result<(), Box<dyn std::error::Error + 'static
         .parse(&mut errors, &source)
         .unwrap();
 
-    let mut ctx = Env::new();
+    let mut env = Env::new();
     for (name, scheme) in funs {
-        ctx.insert(name, scheme);
+        env.insert(name, scheme);
     }
 
-    println!("{}", ctx);
+    println!("{}", env);
     for exp in exps {
         println!("{}", exp);
-        match ctx.infer_type(&exp) {
+        match exp.infer_type(&env) {
             Err(e) => eprintln!("Error: {}", e),
             Ok(ty) => println!("Inferred type: {}", ty),
         }

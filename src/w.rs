@@ -184,6 +184,9 @@ impl TypeMethods for Env {
 impl Env {
     /// Construct an empty type environment.
     pub fn new() -> Env {
+        unsafe {
+            NEXT = 0;
+        }
         Env(Map::new())
     }
 
@@ -194,10 +197,12 @@ impl Env {
             ty: ty.clone(),
         }
     }
+}
 
-    fn infer(&self, exp: &Exp) -> Result<(Type, Subs)> {
-        match exp {
-            Exp::Var(name) => self
+impl Exp {
+    fn infer(&self, env: &Env) -> Result<(Type, Subs)> {
+        match self {
+            Exp::Var(name) => env
                 .get(name)
                 .map(|scheme| (scheme.instantiate(), Subs::new()))
                 .ok_or_else(|| TypeError(format!("Cannot reference unbound variable: {}", name))),
@@ -208,16 +213,16 @@ impl Env {
             },
             Exp::Abs(name, expr) => {
                 let ty_arg = Type::new_var();
-                let mut env = self.clone();
+                let mut env = env.clone();
                 env.insert(name.clone(), Scheme::mono(ty_arg.clone()));
-                let (ty_ret, s1) = env.infer(expr)?;
+                let (ty_ret, s1) = expr.infer(&env)?;
                 let ty_arg = ty_arg.substitute(&s1);
                 let ty_fun = Type::fun(ty_arg, ty_ret);
                 Ok((ty_fun, s1))
             }
             Exp::App(fun, arg) => {
-                let (ty_fun, s1) = self.infer(fun)?;
-                let (ty_arg, s2) = self.substitute(&s1).infer(arg)?;
+                let (ty_fun, s1) = fun.infer(env)?;
+                let (ty_arg, s2) = arg.infer(&env.substitute(&s1))?;
                 let ty_ret = Type::new_var();
                 let ty_fun = ty_fun.substitute(&s2);
                 let s3 = unify(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
@@ -225,12 +230,12 @@ impl Env {
                 Ok((ty_ret, Subs::compose(s3, Subs::compose(s2, s1))))
             }
             Exp::Let(name, arg, body) => {
-                let mut env = self.clone();
+                let mut env = env.clone();
                 env.remove(name);
-                let (ty_arg, s1) = self.infer(arg)?;
+                let (ty_arg, s1) = arg.infer(&env)?;
                 let scheme = env.substitute(&s1).generalize(&ty_arg);
                 env.insert(name.clone(), scheme);
-                let (ty_body, s2) = env.substitute(&s1).infer(body)?;
+                let (ty_body, s2) = body.infer(&env.substitute(&s1))?;
                 Ok((ty_body, Subs::compose(s2, s1)))
             }
             Exp::Error => Ok((Type::Error, Subs::new())),
@@ -238,11 +243,8 @@ impl Env {
     }
 
     /// Perform type inference on an expression and return the resulting type, if any.
-    pub fn infer_type(&self, exp: &Exp) -> Result<Type> {
-        unsafe {
-            NEXT = 0;
-        }
-        let (ty, s) = self.infer(exp)?;
+    pub fn infer_type(&self, env: &Env) -> Result<Type> {
+        let (ty, s) = self.infer(env)?;
         Ok(ty.substitute(&s))
     }
 }

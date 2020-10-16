@@ -17,13 +17,13 @@ impl Subs {
     /// Union `s1` with `s2` and prefer element of `s1` in the case of collision.
     fn union(s1: &Subs, s2: &Subs) -> Self {
         let mut res = s1.clone();
-        for (key, value) in &s2.0 {
-            res.entry(key.clone()).or_insert(value.clone());
+        for (name, ty) in &s2.0 {
+            res.entry(name.clone()).or_insert(ty.clone());
         }
         res
     }
-    /// To compose two substitutions s1 and s2, we apply s1 to each
-    /// type in s2 and union the resulting substitution with s1.
+    /// Composes two substitutions `s1` and `s2` by applying `s1` to each
+    /// type in `s2` and unions the resulting substitution with `s1`.
     fn compose(s1: Subs, s2: Subs) -> Subs {
         let s2 = Subs(
             s2.iter()
@@ -70,15 +70,14 @@ fn unify(ty1: &Type, ty2: &Type) -> Result<Subs> {
     }
 }
 
-static mut NEXT: usize = 0;
-
-impl Type {
-    pub fn new_var() -> Type {
-        unsafe {
-            let var = Type::Var(format!("'t{}", NEXT));
-            NEXT += 1;
-            var
-        }
+impl Gen {
+    pub fn new() -> Self {
+        Gen(0)
+    }
+    pub fn fresh(&mut self) -> Type {
+        let var = Type::Var(format!("'t{}", self.0));
+        self.0 += 1;
+        var
     }
 }
 
@@ -154,12 +153,12 @@ impl Scheme {
     }
     /// Instantiates a scheme into a type. Replaces all bound type variables with fresh type
     /// variables and return the resulting type.
-    fn instantiate(&self) -> Type {
+    fn instantiate(&self, gen: &mut Gen) -> Type {
         self.ty.substitute(&Subs(
             self.vars
                 .iter()
                 .cloned()
-                .zip(self.vars.iter().map(|_| Type::new_var()))
+                .zip(self.vars.iter().map(|_| gen.fresh()))
                 .collect(),
         ))
     }
@@ -184,9 +183,6 @@ impl TypeMethods for Env {
 impl Env {
     /// Construct an empty type environment.
     pub fn new() -> Env {
-        unsafe {
-            NEXT = 0;
-        }
         Env(Map::new())
     }
 
@@ -200,30 +196,30 @@ impl Env {
 }
 
 impl Exp {
-    fn infer(&self, env: &Env) -> Result<(Type, Subs)> {
+    fn infer(&self, env: &Env, gen: &mut Gen) -> Result<(Type, Subs)> {
         match self {
             Exp::Var(name) => env
                 .get(name)
-                .map(|scheme| (scheme.instantiate(), Subs::new()))
+                .map(|scheme| (scheme.instantiate(gen), Subs::new()))
                 .ok_or_else(|| TypeError(format!("Cannot reference unbound variable: {}", name))),
             Exp::Lit(lit) => match lit {
                 Lit::Int(_) => Ok((Type::int(), Subs::new())),
                 Lit::Bool(_) => Ok((Type::bool(), Subs::new())),
                 Lit::Str(_) => Ok((Type::str(), Subs::new())),
             },
-            Exp::Abs(name, expr) => {
-                let ty_arg = Type::new_var();
+            Exp::Abs(name, body) => {
+                let ty_arg = gen.fresh();
                 let mut env = env.clone();
                 env.insert(name.clone(), Scheme::mono(ty_arg.clone()));
-                let (ty_ret, s1) = expr.infer(&env)?;
+                let (ty_ret, s1) = body.infer(&env, gen)?;
                 let ty_arg = ty_arg.substitute(&s1);
                 let ty_fun = Type::fun(ty_arg, ty_ret);
                 Ok((ty_fun, s1))
             }
             Exp::App(fun, arg) => {
-                let (ty_fun, s1) = fun.infer(env)?;
-                let (ty_arg, s2) = arg.infer(&env.substitute(&s1))?;
-                let ty_ret = Type::new_var();
+                let (ty_fun, s1) = fun.infer(env, gen)?;
+                let (ty_arg, s2) = arg.infer(&env.substitute(&s1), gen)?;
+                let ty_ret = gen.fresh();
                 let ty_fun = ty_fun.substitute(&s2);
                 let s3 = unify(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
                 let ty_ret = ty_ret.substitute(&s3);
@@ -232,10 +228,10 @@ impl Exp {
             Exp::Let(name, arg, body) => {
                 let mut env = env.clone();
                 env.remove(name);
-                let (ty_arg, s1) = arg.infer(&env)?;
+                let (ty_arg, s1) = arg.infer(&env, gen)?;
                 let scheme = env.substitute(&s1).generalize(&ty_arg);
                 env.insert(name.clone(), scheme);
-                let (ty_body, s2) = body.infer(&env.substitute(&s1))?;
+                let (ty_body, s2) = body.infer(&env.substitute(&s1), gen)?;
                 Ok((ty_body, Subs::compose(s2, s1)))
             }
             Exp::Error => Ok((Type::Error, Subs::new())),
@@ -244,7 +240,8 @@ impl Exp {
 
     /// Perform type inference on an expression and return the resulting type, if any.
     pub fn infer_type(&self, env: &Env) -> Result<Type> {
-        let (ty, s) = self.infer(env)?;
+        let mut gen = Gen::new();
+        let (ty, s) = self.infer(env, &mut gen)?;
         Ok(ty.substitute(&s))
     }
 }

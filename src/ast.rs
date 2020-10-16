@@ -46,6 +46,9 @@ pub struct Info(Map<TypeName, String>);
 pub struct Subs(pub Map<TypeName, Type>);
 
 #[derive(Clone, Debug, NewType)]
+pub struct Gen(pub usize);
+
+#[derive(Clone, Debug, NewType)]
 pub struct Env(pub Map<TermName, Scheme>);
 
 impl Type {

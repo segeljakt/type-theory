@@ -3,11 +3,11 @@ use {crate::ast::*, std::fmt};
 impl fmt::Display for Exp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Exp::Var(x) => write!(f, "{}", x),
-            Exp::Lit(x) => write!(f, "{}", x),
-            Exp::App(e1, e2) => write!(f, "({} {})", e1, e2),
-            Exp::Abs(i, e) => write!(f, "λ{}.{}", i, e),
-            Exp::Let(i, e1, e2) => write!(f, "let {} = {} in {}", i, e1, e2),
+            Exp::Var(name) => write!(f, "{}", name),
+            Exp::Lit(lit) => write!(f, "{}", lit),
+            Exp::App(fun, arg) => write!(f, "({} {})", fun, arg),
+            Exp::Abs(name, body) => write!(f, "λ{}.{}", name, body),
+            Exp::Let(name, arg, body) => write!(f, "let {} = {} in {}", name, arg, body),
             Exp::Error => write!(f, "<error>"),
         }
     }
@@ -16,9 +16,9 @@ impl fmt::Display for Exp {
 impl fmt::Display for Lit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Lit::Int(x) => write!(f, "{}", x),
-            Lit::Bool(x) => write!(f, "{}", x),
-            Lit::Str(x) => write!(f, "{}", x),
+            Lit::Int(val) => write!(f, "{}", val),
+            Lit::Bool(val) => write!(f, "{}", val),
+            Lit::Str(val) => write!(f, "{}", val),
         }
     }
 }
@@ -26,12 +26,12 @@ impl fmt::Display for Lit {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Type::Var(x) => write!(f, "{}", x),
-            Type::Cons(name, args) if *name == "->" && args.len() == 2 => {
-                write!(f, "({} → {})", args[0], args[1])
+            Type::Var(name) => write!(f, "{}", name),
+            Type::Cons(name, params) if name == "->" && params.len() == 2 => {
+                write!(f, "({} → {})", params[0], params[1])
             }
-            Type::Cons(name, args) if args.len() > 0 => {
-                let args = args
+            Type::Cons(name, params) if params.len() > 0 => {
+                let args = params
                     .iter()
                     .map(|arg| arg.to_string())
                     .collect::<Vec<String>>()
@@ -53,7 +53,7 @@ impl fmt::Display for TypeError {
 
 impl std::error::Error for TypeError {}
 
-impl fmt::Display for Subs {
+impl fmt::Display for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "[")?;
         for (key, val) in self.iter() {
@@ -63,18 +63,21 @@ impl fmt::Display for Subs {
     }
 }
 
-impl fmt::Display for Env {
+impl fmt::Display for Ctx {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (key, Scheme { vars, ty }) in self.iter() {
-            if vars.len() > 0 {
-                let vars = vars
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                writeln!(f, "{} :: ∀ {} . {}", key, vars, ty)?;
-            } else {
-                writeln!(f, "{} :: {}", key, ty)?;
+        for (key, scheme) in self.iter() {
+            match scheme {
+                Scheme::Poly(ty, quantifiers) => {
+                    let quantifiers = quantifiers
+                        .iter()
+                        .map(|name| name.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    writeln!(f, "{} :: ∀ {} . {}", key, quantifiers, ty)?;
+                }
+                Scheme::Mono(ty) => {
+                    writeln!(f, "{} :: {}", key, ty)?;
+                }
             }
         }
         Ok(())

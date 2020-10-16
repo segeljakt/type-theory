@@ -9,7 +9,7 @@ use {
     std::{fs::File, io::prelude::*},
 };
 
-lalrpop_mod!(#[allow(unused_parens)] pub parser);
+lalrpop_mod!(#[allow(unused_parens)] #[clippy::ignore] pub parser);
 
 pub fn compile_file(path: &str) -> Result<(), Box<dyn std::error::Error + 'static>> {
     let mut file = File::open(path)?;
@@ -25,7 +25,7 @@ pub fn compile(source: String) -> Result<(), Box<dyn std::error::Error + 'static
         .parse(&mut errors, &source)
         .unwrap();
 
-    let mut env = Env::new();
+    let mut env = Ctx::new();
     for (name, scheme) in funs {
         env.insert(name, scheme);
     }

@@ -18,6 +18,7 @@ match {
 }
 
 Box<T>: Box<T> = T => Box::new(<>);
+Set<T>: Set<T> = T+ => <>.into_iter().collect();
 
 pub Program: (Vec<(Name, Scheme)>, Vec<Exp>) = Fun* (<Exp> ";")+;
 
@@ -45,24 +46,27 @@ Exp3: Exp = {
     ! => { errors.push(<>); Exp::Error },
 };
 
-Name: Name = TName => <>.to_string();
+Name: Name = TName => <>.into();
 
 Lit: Lit = {
     TInt  => Lit::Int(<>.parse().unwrap()),
     TBool => Lit::Bool(<>.parse().unwrap()),
-    TStr  => Lit::Str(<>.to_string()),
+    TStr  => Lit::Str(<>.into()),
 };
 
-Fun: (Name, Scheme) = <Name> "::" <("∀" <Name+> ".")?> <Type> => {
-  let (name, vars, ty) = (<>);
-  let scheme = Scheme { ty, vars: vars.unwrap_or_else(Vec::new).into_iter().collect() };
-  (name, scheme)
+Fun: (Name, Scheme) = <Name> "::" <("∀" <Set<Name>> ".")?> <Type> => {
+  let (name, quantifiers, ty) = (<>);
+  if let Some(quantifiers) = quantifiers {
+      (name, Scheme::Poly(ty, quantifiers))
+  } else {
+      (name, Scheme::Mono(ty))
+  }
 };
 
 Type = Type0;
 
 Type0: Type = {
-    <Type1> "->" <Type0> => Type::Cons("->".to_string(), vec![<>]),
+    <Type1> "->" <Type0> => Type::Cons("->".into(), vec![<>]),
     Type1,
 };
 

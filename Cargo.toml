@@ -9,6 +9,8 @@ edition = "2018"
 newtype = "0.2.1"
 lalrpop-util = "0.17.0"
 regex = "1.1.6"
+derive_more = { version = "0.99.11", features = ["constructor"] }
+smartstring = "0.2.5"
 
 [build-dependencies]
 lalrpop = "0.17.0"

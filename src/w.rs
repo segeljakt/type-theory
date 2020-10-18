@@ -193,10 +193,10 @@ impl Type {
 
 impl Exp {
     /// Perform type inference on an expression and return the resulting type, if any.
-    pub fn infer_type(&self, env: &Ctx) -> Result<Type> {
+    pub fn infer_type(&self, ctx: &Ctx) -> Result<Type> {
         let mut gen = Gen::new();
-        let (ty, s) = self.infer(env, &mut gen)?;
-        Ok(ty.substitute(&s))
+        let (ty, env) = self.infer(ctx, &mut gen)?;
+        Ok(ty.substitute(&env))
     }
 
     fn infer(&self, ctx: &Ctx, gen: &mut Gen) -> Result<(Type, Env)> {

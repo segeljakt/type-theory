@@ -53,7 +53,7 @@ impl fmt::Display for TypeError {
 
 impl std::error::Error for TypeError {}
 
-impl fmt::Display for Env {
+impl fmt::Display for Env<Type> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "[")?;
         for (key, val) in self.iter() {
@@ -63,7 +63,7 @@ impl fmt::Display for Env {
     }
 }
 
-impl fmt::Display for Ctx {
+impl fmt::Display for Env<Scheme> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (key, scheme) in self.iter() {
             match scheme {

@@ -25,7 +25,7 @@ pub fn compile(source: String) -> Result<(), Box<dyn std::error::Error + 'static
         .parse(&mut errors, &source)
         .unwrap();
 
-    let mut env = Ctx::new();
+    let mut env = Env::new();
     for (name, scheme) in funs {
         env.insert(name, scheme);
     }

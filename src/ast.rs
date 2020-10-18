@@ -1,6 +1,7 @@
 use newtype::NewType;
 pub use smartstring::alias::String as Name;
 pub use std::collections::{HashMap as Map, HashSet as Set};
+use std::fmt::Debug;
 
 /// An expression
 #[derive(Debug)]
@@ -48,17 +49,12 @@ pub enum Scheme {
     Mono(Type),
 }
 
-/// An environment mapping type-variables to types.
 #[derive(Clone, Debug, NewType)]
-pub struct Env(pub Map<Name, Type>);
+pub struct Env<T: Debug + Clone>(pub Map<Name, T>);
 
 /// A type variable generator.
 #[derive(Clone, Debug, NewType)]
 pub struct Gen(pub usize);
-
-/// An environment mapping term-variables (functions) to schemes.
-#[derive(Clone, Debug, NewType)]
-pub struct Ctx(pub Map<Name, Scheme>);
 
 impl Type {
     pub fn int() -> Type {

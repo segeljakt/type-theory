@@ -40,9 +40,9 @@ fn unify(ty1: &Type, ty2: &Type) -> Result<Env<Type>> {
                 params1
                     .iter()
                     .zip(params2)
-                    .try_fold(Env::new(), |env1, (arg1, arg2)| {
-                        let env2 = unify(&arg1.substitute(&env1), &arg2.substitute(&env1))?;
-                        Ok(env2.substitute(&env1))
+                    .try_fold(Env::new(), |env0, (arg1, arg2)| {
+                        let env1 = unify(&arg1.substitute(&env0), &arg2.substitute(&env0))?;
+                        Ok(env1.substitute(&env0))
                     })
             }
         }
@@ -194,43 +194,55 @@ impl Exp {
 
     fn infer(&self, ctx: &Env<Scheme>, gen: &mut Gen) -> Result<(Type, Env<Type>)> {
         match self {
+            Exp::Lit(lit) => match lit {
+                Lit::Int(_) => Ok((Type::int(), Env::new())),
+                Lit::Bool(_) => Ok((Type::bool(), Env::new())),
+                Lit::Str(_) => Ok((Type::str(), Env::new())),
+            },
+            //      x:σ ∈ Γ   t = specialise(σ)
+            // (Var)---------------------------
+            //            Γ ⊢ x:t,∅
             Exp::Var(name) => ctx
                 .get(name)
                 .map(|scheme| (scheme.specialise(gen), Env::new()))
                 .ok_or_else(|| {
                     TypeError(format!("Term is not closed, found free variable: {}", name))
                 }),
-            Exp::Lit(lit) => match lit {
-                Lit::Int(_) => Ok((Type::int(), Env::new())),
-                Lit::Bool(_) => Ok((Type::bool(), Env::new())),
-                Lit::Str(_) => Ok((Type::str(), Env::new())),
-            },
+            //      t = fresh()   Γ,x:t ⊢ e:t',S
+            // (Abs)----------------------------
+            //          Γ ⊢ λx.e:St → t',S
             Exp::Abs(name, body) => {
                 let ty_arg = gen.fresh();
                 let mut ctx = ctx.clone();
                 ctx.insert(name.clone(), Scheme::Mono(ty_arg.clone()));
-                let (ty_ret, env1) = body.infer(&ctx, gen)?;
-                let ty_arg = ty_arg.substitute(&env1);
+                let (ty_ret, env0) = body.infer(&ctx, gen)?;
+                let ty_arg = ty_arg.substitute(&env0);
                 let ty_fun = Type::fun(ty_arg, ty_ret);
-                Ok((ty_fun, env1))
+                Ok((ty_fun, env0))
             }
+            //      Γ ⊢ e₀:t₀,S₀   S₀Γ ⊢ e₁:t₁,S₁   t' = fresh()   S₂ = unify(S₁t₀, t₁ → t')
+            // (App)------------------------------------------------------------------------
+            //                                 Γ ⊢ e₀e₁:S₂t',S₂S₁S₀
             Exp::App(fun, arg) => {
-                let (ty_fun, env1) = fun.infer(ctx, gen)?;
-                let (ty_arg, env2) = arg.infer(&ctx.substitute(&env1), gen)?;
+                let (ty_fun, env0) = fun.infer(ctx, gen)?;
+                let (ty_arg, env1) = arg.infer(&ctx.substitute(&env0), gen)?;
                 let ty_ret = gen.fresh();
-                let ty_fun = ty_fun.substitute(&env2);
-                let env3 = unify(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
-                let ty_ret = ty_ret.substitute(&env3);
-                Ok((ty_ret, env3.substitute(&env2.substitute(&env1))))
+                let ty_fun = ty_fun.substitute(&env1);
+                let env2 = unify(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
+                let ty_ret = ty_ret.substitute(&env2);
+                Ok((ty_ret, env2.substitute(&env1.substitute(&env0))))
             }
+            //      Γ ⊢ e₀:t,S₀    S₀Γ,x:S₀Γ(t) ⊢ e₁:t',S₁
+            // (Abs)--------------------------------------
+            //          Γ ⊢ let x = e₀ in e₁:t',S₁S₀
             Exp::Let(name, arg, body) => {
                 let mut ctx = ctx.clone();
                 ctx.remove(name);
-                let (ty_arg, env1) = arg.infer(&ctx, gen)?;
-                let scheme = ty_arg.generalise(&ctx.substitute(&env1));
+                let (ty_arg, env0) = arg.infer(&ctx, gen)?;
+                let scheme = ty_arg.generalise(&ctx.substitute(&env0));
                 ctx.insert(name.clone(), scheme);
-                let (ty_body, env2) = body.infer(&ctx.substitute(&env1), gen)?;
-                Ok((ty_body, env2.substitute(&env1)))
+                let (ty_body, env1) = body.infer(&ctx.substitute(&env0), gen)?;
+                Ok((ty_body, env1.substitute(&env0)))
             }
             Exp::Error => Ok((Type::Error, Env::new())),
         }

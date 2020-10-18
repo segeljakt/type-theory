@@ -21,8 +21,8 @@ trait TypeMethods {
     fn substitute(&self, env: &Env<Type>) -> Self;
 }
 
-/// Unifies two types `ty1` and `ty2`
-fn unify(ty1: &Type, ty2: &Type) -> Result<Env<Type>> {
+/// Computes the most general unifier of two types `ty1` and `ty2`
+fn mgu(ty1: &Type, ty2: &Type) -> Result<Env<Type>> {
     match (ty1, ty2) {
         (Type::Var(name), ty) | (ty, Type::Var(name)) => {
             if ty.ftv().contains(name) {
@@ -41,7 +41,7 @@ fn unify(ty1: &Type, ty2: &Type) -> Result<Env<Type>> {
                     .iter()
                     .zip(params2)
                     .try_fold(Env::new(), |env0, (arg1, arg2)| {
-                        let env1 = unify(&arg1.substitute(&env0), &arg2.substitute(&env0))?;
+                        let env1 = mgu(&arg1.substitute(&env0), &arg2.substitute(&env0))?;
                         Ok(env1.substitute(&env0))
                     })
             }
@@ -220,7 +220,7 @@ impl Exp {
                 let ty_fun = Type::fun(ty_arg, ty_ret);
                 Ok((ty_fun, env0))
             }
-            //      Γ ⊢ e₀:t₀,S₀   S₀Γ ⊢ e₁:t₁,S₁   t' = fresh()   S₂ = unify(S₁t₀, t₁ → t')
+            //      Γ ⊢ e₀:t₀,S₀   S₀Γ ⊢ e₁:t₁,S₁   t' = fresh()   S₂ = mgu(S₁t₀, t₁ → t')
             // (App)------------------------------------------------------------------------
             //                                 Γ ⊢ e₀e₁:S₂t',S₂S₁S₀
             Exp::App(fun, arg) => {
@@ -228,7 +228,7 @@ impl Exp {
                 let (ty_arg, env1) = arg.infer(&ctx.substitute(&env0), gen)?;
                 let ty_ret = gen.fresh();
                 let ty_fun = ty_fun.substitute(&env1);
-                let env2 = unify(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
+                let env2 = mgu(&ty_fun, &Type::fun(ty_arg, ty_ret.clone()))?;
                 let ty_ret = ty_ret.substitute(&env2);
                 Ok((ty_ret, env2.substitute(&env1.substitute(&env0))))
             }

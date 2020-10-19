@@ -2,6 +2,7 @@ pub mod ast;
 pub mod conversion;
 pub mod display;
 pub mod w;
+pub mod wand;
 
 use {
     crate::ast::*,

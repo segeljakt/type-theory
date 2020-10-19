@@ -1,4 +1,5 @@
 use {crate::ast::*, std::fmt};
+use crate::ast::result::*;
 
 impl fmt::Display for Exp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -7,7 +8,8 @@ impl fmt::Display for Exp {
             Exp::Lit(lit) => write!(f, "{}", lit),
             Exp::App(fun, arg) => write!(f, "({} {})", fun, arg),
             Exp::Abs(name, body) => write!(f, "λ{}.{}", name, body),
-            Exp::Let(name, arg, body) => write!(f, "let {} = {} in {}", name, arg, body),
+            Exp::Let(name, rhs, body) => write!(f, "let {} = {} in {}", name, rhs, body),
+            Exp::LetRec(name, rhs, body) => write!(f, "let rec {} = {} in {}", name, rhs, body),
             Exp::Error => write!(f, "<error>"),
         }
     }

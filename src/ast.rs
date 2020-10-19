@@ -3,6 +3,12 @@ pub use smartstring::alias::String as Name;
 pub use std::collections::{HashMap as Map, HashSet as Set};
 use std::fmt::Debug;
 
+pub mod result {
+    pub type Result<T> = std::result::Result<T, TypeError>;
+    #[derive(Debug)]
+    pub struct TypeError(pub String);
+}
+
 /// An expression
 #[derive(Debug)]
 pub enum Exp {
@@ -16,6 +22,8 @@ pub enum Exp {
     Abs(Name, Box<Exp>),
     /// Let-binding
     Let(Name, Box<Exp>, Box<Exp>),
+    /// Let-binding
+    LetRec(Name, Box<Exp>, Box<Exp>),
     /// An error
     Error,
 }
@@ -31,7 +39,7 @@ pub enum Lit {
     Str(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Type {
     /// Variable type (Name is free)
     Var(Name),
@@ -70,6 +78,3 @@ impl Type {
         Type::Cons("->".into(), vec![arg, ret])
     }
 }
-
-#[derive(Debug)]
-pub struct TypeError(pub String);

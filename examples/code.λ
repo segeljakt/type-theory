@@ -2,6 +2,12 @@
 + :: int -> int -> int
 * :: ∀A . A -> A 
 
+let rec foo = λx.foo x in foo;
+
+let rec foo = λx.foo x in foo 3;
+
+let rec foo = λx.true in foo 2;
+
 * 1;
 
 let id = λx.x in

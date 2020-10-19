@@ -6,7 +6,7 @@ grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, &'static
 match {
     "(", ")",
     "λ", ".",
-    "let", "=", "in",
+    "let", "rec", "=", "in",
     "::", "∀", "->",
     ";",
 } else {
@@ -26,6 +26,7 @@ Exp = Exp0;
 
 Exp0: Exp = {
     "let" <Name> "=" <Box<Exp1>> "in" <Box<Exp0>> => Exp::Let(<>),
+    "let" "rec" <Name> "=" <Box<Exp1>> "in" <Box<Exp0>> => Exp::LetRec(<>),
     Exp1,
 };
 

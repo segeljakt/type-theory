@@ -199,13 +199,13 @@ impl Type {
 
 impl Exp {
     /// Perform type inference on an expression and return the resulting type, if any.
-    pub fn infer_type(&self, ctx: &Env<Scheme>) -> Result<Type> {
+    pub fn infer_w(&self, ctx: &Env<Scheme>) -> Result<Type> {
         let mut gen = Gen::new();
-        let (t, s) = self.infer(ctx, &mut gen)?;
+        let (t, s) = self.w(ctx, &mut gen)?;
         Ok(t.substitute(&s))
     }
 
-    fn infer(&self, ctx: &Env<Scheme>, gen: &mut Gen) -> Result<(Type, Env<Type>)> {
+    fn w(&self, ctx: &Env<Scheme>, gen: &mut Gen) -> Result<(Type, Env<Type>)> {
         match self {
             Exp::Lit(l) => match l {
                 Lit::Int(_) => Ok((Type::int(), Env::new())),
@@ -228,44 +228,44 @@ impl Exp {
                 let t0 = gen.fresh();
                 let mut ctxm = ctx.clone();
                 ctxm.insert(x.clone(), Scheme::Mono(t0.clone()));
-                let (t1, s0) = e.infer(&ctxm, gen)?;
+                let (t1, s0) = e.w(&ctxm, gen)?;
                 Ok((Type::fun(t0.substitute(&s0), t1), s0))
             }
             //      Γ ⊢ e₀:t₀,S₀   S₀Γ ⊢ e₁:t₁,S₁   t₂ = fresh()   S₂ = mgu(S₁t₀, t₁ → t₂)
             // (App)----------------------------------------------------------------------
             //                         Γ ⊢ e₀ e₁:S₂t₂,S₂S₁S₀
             Exp::App(e0, e1) => {
-                let (t0, s0) = e0.infer(ctx, gen)?;
-                let (t1, s1) = e1.infer(&ctx.substitute(&s0), gen)?;
+                let (t0, s0) = e0.w(ctx, gen)?;
+                let (t1, s1) = e1.w(&ctx.substitute(&s0), gen)?;
                 let t2 = gen.fresh();
                 let s2 = Type::mgu(&t0.substitute(&s1), &Type::fun(t1, t2.clone()))?;
                 Ok((t2.substitute(&s2), s2.substitute(&s1.substitute(&s0))))
             }
-            //      Γ ⊢ e₀:t₀,S₀   a = fv(t) - fv(S₀Γ)   S₀Γ,x:∀a.t₀ ⊢ e₁:t₁,S₁
-            // (Let)-----------------------------------------------------------
+            //      Γ ⊢ e₀:t₀,S₀   S₀Γ ⊢ p = generalise(t₀)   S₀Γ,x:p ⊢ e₁:t₁,S₁
+            // (Let)------------------------------------------------------------
             //               Γ ⊢ let x = e₀ in e₁:t₁,S₁S₀
             Exp::Let(x, e0, e1) => {
-                let (t0, s0) = e0.infer(&ctx, gen)?;
+                let (t0, s0) = e0.w(&ctx, gen)?;
                 let mut ctxp = ctx.clone();
                 ctxp.remove(x);
                 let p = t0.generalise(&ctxp.substitute(&s0));
                 ctxp.insert(x.clone(), p);
-                let (t1, s1) = e1.infer(&ctxp.substitute(&s0), gen)?;
+                let (t1, s1) = e1.w(&ctxp.substitute(&s0), gen)?;
                 Ok((t1, s1.substitute(&s0)))
             }
-            //         Γ,x:t₀ ⊢ e₀:t₀,S₀   a = fv(t) - fv(S₀Γ)   S₀Γ,x:∀a.t₀ ⊢ e₁:t₁,S₁
-            // (LetRec)----------------------------------------------------------------
+            //         Γ,x:t₀ ⊢ e₀:t₀,S₀   S₀Γ ⊢ p = generalise(t₀)   S₀Γ,x:p ⊢ e₁:t₁,S₁
+            // (LetRec)-----------------------------------------------------------------
             //               Γ ⊢ let rec x = e₀ in e₁:t₁
             Exp::LetRec(x, e0, e1) => {
                 let t0 = gen.fresh();
                 let m = Scheme::Mono(t0.clone());
                 let mut ctxm = ctx.clone();
                 ctxm.insert(x.clone(), m);
-                let (t0, s0) = e0.infer(&ctxm, gen)?;
+                let (t0, s0) = e0.w(&ctxm, gen)?;
                 let mut ctxp = ctx.clone();
                 let p = t0.generalise(&ctxp.substitute(&s0));
                 ctxp.insert(x.clone(), p);
-                let (t1, s1) = e1.infer(&ctxp.substitute(&s0), gen)?;
+                let (t1, s1) = e1.w(&ctxp.substitute(&s0), gen)?;
                 Ok((t1, s1.substitute(&s0)))
             }
             Exp::Error => Ok((Type::Error, Env::new())),

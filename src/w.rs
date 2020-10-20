@@ -205,6 +205,7 @@ impl Exp {
         Ok(t.substitute(&s))
     }
 
+    /// Algorithm W
     fn w(&self, ctx: &Env<Scheme>, gen: &mut Gen) -> Result<(Type, Env<Type>)> {
         match self {
             Exp::Lit(l) => match l {

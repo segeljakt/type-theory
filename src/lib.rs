@@ -26,17 +26,17 @@ pub fn compile(source: String) -> Result<(), Box<dyn std::error::Error + 'static
         .parse(&mut errors, &source)
         .unwrap();
 
-    let mut env = Env::new();
+    let mut ctx = Env::new();
     for (name, scheme) in funs {
-        env.insert(name, scheme);
+        ctx.insert(name, scheme);
     }
 
-    println!("{}", env);
+    println!("{}", ctx);
     for exp in exps {
         println!("{}", exp);
-        match exp.infer_type(&env) {
-            Err(e) => eprintln!("Error: {}", e),
-            Ok(ty) => println!("Inferred type: {}", ty),
+        match exp.infer_w(&ctx) {
+            Err(e) => eprintln!("[W] Error: {}", e),
+            Ok(ty) => println!("[W] Inferred type: {}", ty),
         }
         println!("");
     }

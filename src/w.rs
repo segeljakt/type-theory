@@ -1,4 +1,3 @@
-// Derived from https://github.com/nwoeanhinnogaehr/algorithmw-rust
 use crate::ast::result::{Result, TypeError};
 use crate::ast::*;
 use std::fmt::Debug;
@@ -27,35 +26,32 @@ pub trait TypeMethods {
     /// Returns the set of free type variables of self
     fn ftv(&self) -> Set<Name>;
     /// Applies a substitution to self
-    fn substitute(&self, env: &Env<Type>) -> Self;
+    fn substitute(&self, s: &Env<Type>) -> Self;
 }
 
 impl Type {
     /// Computes the most general unifier of two types `ty1` and `ty2`
-    fn mgu(ty1: &Type, ty2: &Type) -> Result<Env<Type>> {
-        match (ty1, ty2) {
-            (Type::Var(name), ty) | (ty, Type::Var(name)) => {
-                if ty.ftv().contains(name) {
-                    Err(TypeError(format!("`{}` and `{}` are recursive", ty1, ty2)))
+    fn mgu(t0: &Type, t1: &Type) -> Result<Env<Type>> {
+        match (t0, t1) {
+            (Type::Var(x), t) | (t, Type::Var(x)) => {
+                if t.ftv().contains(x) {
+                    Err(TypeError(format!("`{}` and `{}` are recursive", t0, t1)))
                 } else {
-                    let mut env = Env::new();
-                    env.insert(name.clone(), ty.clone());
-                    Ok(env)
+                    let mut s = Env::new();
+                    s.insert(x.clone(), t.clone());
+                    Ok(s)
                 }
             }
-            (Type::Cons(name1, params1), Type::Cons(name2, params2)) => {
-                if name1 != name2 || params1.len() != params2.len() {
-                    Err(TypeError(format!("Cannot unify `{}` with `{}`", ty1, ty2)))
+            (Type::Cons(x0, ts0), Type::Cons(x1, ts1)) => {
+                if x0 != x1 || ts0.len() != ts1.len() {
+                    Err(TypeError(format!("Cannot unify `{}` with `{}`", t0, t1)))
                 } else {
-                    params1
-                        .iter()
-                        .zip(params2)
-                        .try_fold(Env::new(), |env0, (param1, param2)| {
-                            let param1 = param1.substitute(&env0);
-                            let param2 = param2.substitute(&env0);
-                            let env1 = Type::mgu(&param1, &param2)?;
-                            Ok(env1.substitute(&env0))
-                        })
+                    ts0.iter().zip(ts1).try_fold(Env::new(), |s0, (t0, t1)| {
+                        let t0 = t0.substitute(&s0);
+                        let t1 = t1.substitute(&s0);
+                        let s1 = Type::mgu(&t0, &t1)?;
+                        Ok(s1.substitute(&s0))
+                    })
                 }
             }
             (Type::Error, _) | (_, Type::Error) => Ok(Env::new()),
@@ -68,9 +64,9 @@ impl Gen {
         Gen(0)
     }
     pub fn fresh(&mut self) -> Type {
-        let var = Type::Var(format!("'t{}", self.0).into());
+        let t = Type::Var(format!("'t{}", self.0).into());
         self.0 += 1;
-        var
+        t
     }
 }
 
@@ -78,21 +74,21 @@ impl TypeMethods for Type {
     // Return the set of all (free) Type::Var in self
     fn ftv(&self) -> Set<Name> {
         match self {
-            Type::Var(name) => {
-                let mut set = Set::new();
-                set.insert(name.clone());
-                set
+            Type::Var(x) => {
+                let mut s = Set::new();
+                s.insert(x.clone());
+                s
             }
-            Type::Cons(_, params) => params.ftv(),
+            Type::Cons(_, ts) => ts.ftv(),
             Type::Error => Set::new(),
         }
     }
 
     // Substitute all type variables in `self` with `env`
-    fn substitute(&self, env: &Env<Type>) -> Type {
+    fn substitute(&self, s: &Env<Type>) -> Type {
         match self {
-            Type::Var(name) => env.get(name).cloned().unwrap_or(self.clone()),
-            Type::Cons(name, params) => Type::Cons(name.clone(), params.substitute(env)),
+            Type::Var(x) => s.get(x).cloned().unwrap_or(self.clone()),
+            Type::Cons(x, ts) => Type::Cons(x.clone(), ts.substitute(s)),
             Type::Error => Type::Error,
         }
     }
@@ -101,13 +97,12 @@ impl TypeMethods for Type {
 /// Helper methods for Type and Scheme
 impl<'a, T: TypeMethods> TypeMethods for Vec<T> {
     fn ftv(&self) -> Set<Name> {
-        self.iter().fold(Set::new(), |set, ty| {
-            set.union(&ty.ftv()).cloned().collect()
-        })
+        self.iter()
+            .fold(Set::new(), |ftv, t| ftv.union(&t.ftv()).cloned().collect())
     }
 
-    fn substitute(&self, env: &Env<Type>) -> Vec<T> {
-        self.iter().map(|ty| ty.substitute(env)).collect()
+    fn substitute(&self, s: &Env<Type>) -> Vec<T> {
+        self.iter().map(|t| t.substitute(s)).collect()
     }
 }
 
@@ -116,21 +111,21 @@ impl TypeMethods for Scheme {
     /// in the internal type and not bound by the variable mapping.
     fn ftv(&self) -> Set<Name> {
         match self {
-            Scheme::Mono(ty) => ty.ftv(),
-            Scheme::Poly(ty, quantifiers) => ty.ftv().difference(&quantifiers).cloned().collect(),
+            Scheme::Mono(t) => t.ftv(),
+            Scheme::Poly(t, qs) => t.ftv().difference(&qs).cloned().collect(),
         }
     }
 
     /// Substitutions are applied to free type variables only.
-    fn substitute(&self, env: &Env<Type>) -> Scheme {
+    fn substitute(&self, s: &Env<Type>) -> Scheme {
         match self {
-            Scheme::Mono(ty) => Scheme::Mono(ty.substitute(env)),
-            Scheme::Poly(ty, quantifiers) => Scheme::Poly(
-                ty.substitute(&quantifiers.iter().fold(env.clone(), |mut env, var| {
-                    env.remove(var);
-                    env
+            Scheme::Mono(t) => Scheme::Mono(t.substitute(s)),
+            Scheme::Poly(t, qs) => Scheme::Poly(
+                t.substitute(&qs.iter().fold(s.clone(), |mut s, q| {
+                    s.remove(q);
+                    s
                 })),
-                quantifiers.clone(),
+                qs.clone(),
             ),
         }
     }
@@ -140,12 +135,11 @@ impl TypeMethods for Env<Type> {
     fn ftv(&self) -> Set<Name> {
         self.values().cloned().collect::<Vec<Type>>().ftv()
     }
-    fn substitute(&self, env: &Env<Type>) -> Self {
-        let env = Env(env
+    fn substitute(&self, s: &Env<Type>) -> Self {
+        self.clone().union(Env(s
             .iter()
-            .map(|(name, ty)| (name.clone(), ty.substitute(self)))
-            .collect());
-        self.clone().union(env)
+            .map(|(x, t)| (x.clone(), t.substitute(self)))
+            .collect()))
     }
 }
 
@@ -157,10 +151,10 @@ impl TypeMethods for Env<Scheme> {
     }
 
     /// To apply a substitution, we just apply it to each scheme in the type environment.
-    fn substitute(&self, env: &Env<Type>) -> Env<Scheme> {
+    fn substitute(&self, s: &Env<Type>) -> Env<Scheme> {
         Env(self
             .iter()
-            .map(|(name, scheme)| (name.clone(), scheme.substitute(env)))
+            .map(|(name, scheme)| (name.clone(), scheme.substitute(s)))
             .collect())
     }
 }
@@ -170,11 +164,11 @@ impl Scheme {
     /// with fresh type variables.
     pub fn specialise(&self, gen: &mut Gen) -> Type {
         match self {
-            Scheme::Mono(ty) => ty.clone(),
-            Scheme::Poly(ty, quantifiers) => ty.substitute(&Env(quantifiers
+            Scheme::Mono(t) => t.clone(),
+            Scheme::Poly(t, qs) => t.substitute(&Env(qs
                 .iter()
                 .cloned()
-                .zip(quantifiers.iter().map(|_| gen.fresh()))
+                .zip(qs.iter().map(|_| gen.fresh()))
                 .collect())),
         }
     }

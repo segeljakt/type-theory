@@ -183,10 +183,10 @@ impl Type {
             .difference(&ctx.ftv())
             .cloned()
             .collect::<Set<Name>>();
-        if !qs.is_empty() {
-            Scheme::Poly(self.clone(), qs)
-        } else {
+        if qs.is_empty() {
             Scheme::Mono(self.clone())
+        } else {
+            Scheme::Poly(self.clone(), qs)
         }
     }
 }

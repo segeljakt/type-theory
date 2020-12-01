@@ -177,14 +177,14 @@ impl Scheme {
 impl Type {
     /// Generalises a type into a scheme by quantifying over
     /// all free variables in the type.
-    pub fn generalise(self: &Type, ctx: &Env<Scheme>) -> Scheme {
-        let quantifiers = self
+    pub fn generalise(&self, ctx: &Env<Scheme>) -> Scheme {
+        let qs = self
             .ftv()
             .difference(&ctx.ftv())
             .cloned()
             .collect::<Set<Name>>();
-        if !quantifiers.is_empty() {
-            Scheme::Poly(self.clone(), quantifiers)
+        if !qs.is_empty() {
+            Scheme::Poly(self.clone(), qs)
         } else {
             Scheme::Mono(self.clone())
         }

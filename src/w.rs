@@ -250,7 +250,7 @@ impl Exp {
             }
             //         Γ,x:t₀ ⊢ e₀:t₀,S₀   S₀Γ ⊢ p = generalise(t₀)   S₀Γ,x:p ⊢ e₁:t₁,S₁
             // (LetRec)-----------------------------------------------------------------
-            //               Γ ⊢ let rec x = e₀ in e₁:t₁
+            //               Γ ⊢ let rec x = e₀ in e₁:t₁,S₁S₀
             Exp::LetRec(x, e0, e1) => {
                 let t0 = gen.fresh();
                 let m = Scheme::Mono(t0.clone());
